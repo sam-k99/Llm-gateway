@@ -1,0 +1,11 @@
+fastapi==0.111.0
+uvicorn==0.30.1
+litellm==1.41.21
+pydantic==2.7.4
+python-dotenv==1.0.1
+openai==1.27.0
+httpx==0.27.0
+redis==5.0.4
+numpy==1.26.4
+prometheus-fastapi-instrumentator==6.1.0
+prometheus-client==0.20.0
