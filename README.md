@@ -1,3 +1,4 @@
+<img width="1920" height="995" alt="dashboard02" src="https://github.com/user-attachments/assets/18a6c41a-8308-4856-bef3-f3c3ed5de8aa" />
 
 
 The **LLM Gateway** is a high-throughput, production-grade API middleware designed to sit between client applications and Large Language Model (LLM) providers. 
