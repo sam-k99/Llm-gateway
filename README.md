@@ -532,10 +532,7 @@ Pull requests are welcome. If you extend the routing logic, cache layer, or
 guardrails, please include benchmark results from `python benchmark.py` before
 and after your change so reviewers can see the impact.
 
-## License
 
-No license file is bundled yet. If you plan to reuse this project, add one
-(MIT and Apache-2.0 are common defaults) so downstream users know their rights.
 
 <div align="center">
 
