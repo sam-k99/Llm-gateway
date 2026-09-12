@@ -12,9 +12,8 @@
 > provider — routing by complexity, answering duplicates instantly from a semantic
 > cache, and scrubbing PII before anything leaves your perimeter.
 
-<div align="center">
-  ![Dashboard](assets/dashboard01.png)
-</div>
+![Dashboard](assets/dashboard02.png)
+
 ## Overview
 
 The **LLM Gateway** is a high-throughput, production-grade API middleware designed
