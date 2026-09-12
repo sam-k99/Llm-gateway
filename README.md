@@ -1,24 +1,93 @@
-<img width="1920" height="995" alt="dashboard02" src="https://github.com/user-attachments/assets/18a6c41a-8308-4856-bef3-f3c3ed5de8aa" />
+# LLM Gateway
 
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white)
+![Mistral AI](https://img.shields.io/badge/LLM-Mistral_AI-FF7000?logo=mistralai&logoColor=white)
+![Redis](https://img.shields.io/badge/Cache-Redis-DC382D?logo=redis&logoColor=white)
+![Prometheus](https://img.shields.io/badge/Metrics-Prometheus-E6522C?logo=prometheus&logoColor=white)
+![Grafana](https://img.shields.io/badge/Dashboard-Grafana-F46800?logo=grafana&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 
-The **LLM Gateway** is a high-throughput, production-grade API middleware designed to sit between client applications and Large Language Model (LLM) providers. 
+> A production-grade API middleware that sits between your application and your LLM
+> provider — routing by complexity, answering duplicates instantly from a semantic
+> cache, and scrubbing PII before anything leaves your perimeter.
 
-As enterprises scale AI adoption, they face three critical bottlenecks: exorbitant API costs, latency bottlenecks, and security vulnerabilities (PII leaks and prompt injections). This gateway solves these issues by providing a unified, OpenAI-compatible API interface that handles dynamic model routing, semantic caching, real-time safety guardrails, and full observability.
+<p align="center">
+  <img width="1920" height="995" alt="Grafana live monitoring dashboard" src="https://github.com/user-attachments/assets/18a6c41a-8308-4856-bef3-f3c3ed5de8aa" />
+</p>
 
----
+## Overview
 
-## 🚀 Key Features
+The **LLM Gateway** is a high-throughput, production-grade API middleware designed
+to sit between client applications and Large Language Model providers.
 
-*   **Dynamic Model Routing:** Classifies prompt complexity and routes simple queries to cheap/fast models (`open-mistral-7b`), reserving expensive models (`mistral-large-latest`) for complex reasoning tasks.
-*   **Semantic Caching:** Utilizes Redis and vector embeddings to cache responses. If a similar prompt (cosine similarity > 85%) is received, the gateway returns the cached response instantly, bypassing the LLM entirely.
-*   **Security & Guardrails:** Intercepts prompts to redact Personally Identifiable Information (PII) using Regex and blocks adversarial prompt injection attacks before they reach external servers.
-*   **Observability:** Tracks token usage, cost, cache hits, and latency per request in real-time using Prometheus, visualized in a live Grafana dashboard.
+As enterprises scale AI adoption, they run into three critical bottlenecks:
+exorbitant API costs, latency ceilings, and security vulnerabilities (PII leaks
+and prompt injections). This gateway addresses all three behind a single,
+OpenAI-compatible API interface that handles dynamic model routing, semantic
+caching, real-time safety guardrails, and full observability.
 
----
+Everything runs locally in Docker Compose: one command starts the gateway,
+the Redis cache, Prometheus, and Grafana.
 
-## 📊 Real-World Benchmark Results
+## The Problem
 
-Tested against 50 varied and semantically duplicated requests (simulating real-world chatbot traffic where users ask the same questions differently):
+| Bottleneck | Without a gateway | With this gateway |
+| --- | --- | --- |
+| API cost | Every request pays full price for the most capable model | Prompts are classified by complexity and simple ones go to cheap models; duplicates are served from cache for free |
+| Latency | A repeated question still waits on a full LLM round trip | A cache hit (cosine similarity above 0.85) returns instantly, bypassing the LLM entirely |
+| Security | Raw user input — SSNs, emails, injection payloads — flows straight to a third-party API | PII is redacted and prompt injections are blocked before anything leaves the perimeter |
+
+The goal is not to hide the LLM behind magic — it is to make every call cheaper,
+faster, and safer by default, while keeping the interface identical to the
+OpenAI API your application already speaks.
+
+## Key Features
+
+| Feature | What it does |
+| --- | --- |
+| Dynamic model routing | Classifies prompt complexity and routes simple queries to cheap, fast models (`open-mistral-7b`), reserving expensive models (`mistral-large-latest`) for complex reasoning tasks |
+| Semantic caching | Uses Redis and vector embeddings to cache responses. If a similar prompt (cosine similarity above 0.85) arrives, the gateway returns the cached response instantly, bypassing the LLM entirely |
+| Security guardrails | Intercepts prompts to redact personally identifiable information using regex, and blocks adversarial prompt injection attacks before they reach external servers |
+| Observability | Tracks token usage, cost, cache hits, and latency per request in real time with Prometheus, visualized in a live Grafana dashboard |
+
+## Quick Start
+
+After completing [Setup and Installation](#setup-and-installation):
+
+```bash
+docker-compose up -d --build
+curl -X POST http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "auto-router", "messages": [{"role": "user", "content": "What is the capital of France?"}]}'
+```
+
+## Table of Contents
+
+- [Overview](#overview)
+- [The Problem](#the-problem)
+- [Key Features](#key-features)
+- [Benchmark Results](#benchmark-results)
+- [How It Works: The Request Lifecycle](#how-it-works-the-request-lifecycle)
+- [Architecture](#architecture)
+- [Observability](#observability)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Setup and Installation](#setup-and-installation)
+- [Usage](#usage)
+- [Command Reference](#command-reference)
+- [Accessing the UIs](#accessing-the-uis)
+- [Engineering Challenges and Solutions](#engineering-challenges-and-solutions)
+- [Limitations and Scope](#limitations-and-scope)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Benchmark Results
+
+Tested against 50 varied and semantically duplicated requests — simulating
+real-world chatbot traffic, where users ask the same questions in different
+words:
 
 ```text
 ========================================
@@ -35,250 +104,165 @@ Cost WITH Gateway (Mistral+Cache): $0.0002
 Total Money Saved   : $0.2460 (99.90% reduction)
 ========================================
 ```
-*Result:* By routing to cheaper models and utilizing semantic caching, the gateway effectively eliminates standard API costs for redundant traffic, achieving a **99.90% cost reduction** compared to standard GPT-4o routing.
 
----
+| Metric | Value |
+| --- | --- |
+| Cache hit rate | 94% (47 of 50 requests served without an LLM call) |
+| Average latency per request | 954.95 ms |
+| Cost without gateway (GPT-4o) | $0.2463 |
+| Cost with gateway (Mistral + cache) | $0.0002 |
+| Total saved | $0.2460 — a 99.90% reduction |
 
-## 📈 Live Monitoring Dashboard (Grafana)
+By routing to cheaper models and serving redundant traffic from the semantic
+cache, the gateway effectively eliminates standard API costs for duplicate
+traffic. Reproduce the run yourself with `python benchmark.py`. Note that the
+savings scale with how redundant your traffic is — the benchmark intentionally
+mirrors the repetition typical of real chatbot workloads.
 
-The gateway exposes a `/metrics` endpoint that Prometheus scrapes every 5 seconds. Grafana visualizes this data in real-time, allowing engineering teams to monitor cache hit rates, token consumption, and API latency.
+## How It Works: The Request Lifecycle
 
-Grafana hits vs misses
-![Grafana Dashboard](dashboard03.png)
-![Grafana Dashboard](dashboard05.png)
+Every request to the gateway passes through six stages:
 
-Token usage and latency
-![Grafana Dashboard](dashboard08.png)
-![Grafana Dashboard](dashboard06.png)
+1. **Input validation and logging** — The request hits the FastAPI server and
+   Prometheus instrumentation begins tracking it immediately.
+2. **Security guardrails** — PII is redacted with regex rules (an SSN becomes
+   `[REDACTED]`), and known prompt injection patterns are screened. Malicious
+   prompts are blocked before anything leaves your perimeter.
+3. **Semantic cache lookup** — The prompt is embedded and compared against
+   cached prompts in Redis using cosine similarity. A match above the 0.85
+   threshold returns the cached response instantly, and the LLM is never
+   called. A miss continues down the pipeline.
+4. **Dynamic routing** — An LLM-based classifier labels the prompt simple or
+   complex. Simple prompts go to `open-mistral-7b`; complex reasoning tasks go
+   to `mistral-large-latest`.
+5. **LLM provider call** — The chosen model is called through the
+   OpenAI-compatible client.
+6. **Response processing** — Cost is calculated from token counts and per-model
+   rates, the prompt/response pair is stored in the cache for future lookups,
+   and metrics are recorded. The JSON response returns to the client.
 
-terminal-view
-![Grafana Dashboard](dashboard01.png)
+The payoff of this ordering: security screening happens *before* anything is
+sent externally, and the cache check happens *before* any model is invoked —
+so a cache hit costs you neither tokens nor latency.
 
+## Architecture
 
----
+```mermaid
+flowchart TD
+    C["Client App / User"] --> V
 
-## 🛠 Tech Stack
+    subgraph GW["FastAPI Gateway Application"]
+        V["1. Input Validation<br/>and Prometheus logging"] --> S["2. Security Guardrails<br/>PII redaction and<br/>prompt injection screening"]
+        S --> K{"3. Semantic Cache<br/>Redis + embeddings<br/>threshold 0.85"}
+        K -- "cache hit" --> HIT["Return cached response<br/>LLM bypassed"]
+        K -- "cache miss" --> R{"4. Dynamic Router<br/>LLM complexity classifier"}
+        R -- "simple" --> CHEAP["open-mistral-7b"]
+        R -- "complex" --> BIG["mistral-large-latest"]
+        CHEAP --> LLM["5. External LLM API"]
+        BIG --> LLM
+        LLM --> RP["6. Response Processor<br/>cost calculation<br/>store in cache<br/>emit metrics"]
+    end
 
-*   **API Framework:** FastAPI (Python 3.12)
-*   **LLM Routing:** OpenAI-compatible client (Mistral AI)
-*   **Caching Layer:** Redis, NumPy (Cosine Similarity Vector Math)
-*   **Security:** Custom Regex PII Redaction, Prompt Injection Defense
-*   **Observability:** Prometheus, Grafana
-*   **Containerization:** Docker, Docker Compose
-
----
-
-## 🏗 Architecture Diagram
-
-```text
-[Client App / User]
-       |
-       v
-+---------------------------------------------------+
-|           FastAPI Gateway Application             |
-|                                                   |
-| 1. Input Validation & Logging (Prometheus)        |
-|       |                                           |
-|       v                                           |
-| 2. Security Guardrails                            |
-|    - PII Redaction (e.g., SSN -> [REDACTED])      |
-|    - Prompt Injection Detection (Block/Reject)    |
-|       |                                           |
-|       v                                           |
-| 3. Semantic Cache Layer (Redis Vector DB)         |
-|    - Generate Embedding for prompt                |
-|    - Check for similar cached prompts (> 0.85 sim)|
-|    - IF MATCH: Return cached response (Exit)      |
-|    - IF NO MATCH: Proceed to Router               |
-|       |                                           |
-|       v                                           |
-| 4. Dynamic Router                                 |
-|    - LLM Classifier (Simple vs. Complex)          |
-|    - IF Simple: Route to open-mistral-7b          |
-|    - IF Complex: Route to mistral-large-latest    |
-|       |                                           |
-|       v                                           |
-| 5. LLM Provider (External API)                    |
-|       |                                           |
-|       v                                           |
-| 6. Response Processor                             |
-|    - Calculate Cost (Tokens * Rate)               |
-|    - Store Prompt+Response in Redis Cache         |
-|    - Log Metrics to Prometheus                    |
-+---------------------------------------------------+
-       |
-       v
-[JSON Response Returned to Client]
+    HIT --> J["JSON Response to Client"]
+    RP --> J
 ```
 
----
+The gateway exposes an OpenAI-compatible `/v1/chat/completions` endpoint, so
+existing OpenAI clients and SDKs can point their base URL at the gateway
+instead of the provider — no client-side changes required.
 
-## ⚙️ How to Run Locally
+Four containers make up the running system:
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/sam-k99/llm-gateway.git
-   cd llm-gateway
-   ```
+| Container | Service | Port |
+| --- | --- | --- |
+| `llm-gateway-app` | FastAPI gateway server | 8000 |
+| `llm-gateway-redis` | Redis semantic cache | 6379 |
+| `llm-gateway-prometheus` | Metrics scraping and storage | 9090 |
+| `llm-gateway-grafana` | Live dashboards | 3000 |
 
-2. **Set Environment Variables:**
-   Create a `.env` file in the root directory and add your API key:
-   ```env
-   MISTRAL_API_KEY=your-mistral-api-key-here
-   ```
+## Observability
 
-3. **Spin up the infrastructure:**
-   Ensure Docker and Docker Compose are installed, then run:
-   ```bash
-   docker-compose up -d --build
-   ```
-   This will start four containers:
-   * `llm-gateway-app` (FastAPI Server on port 8000)
-   * `llm-gateway-redis` (Redis Cache on port 6379)
-   * `llm-gateway-prometheus` (Monitoring on port 9090)
-   * `llm-gateway-grafana` (Dashboard on port 3000)
+The gateway exposes a `/metrics` endpoint that Prometheus scrapes every 5
+seconds. Grafana visualizes this data in real time, letting engineering teams
+monitor cache hit rates, token consumption, cost, and API latency.
 
-4. **Test the Endpoint:**
-   ```bash
-   curl -X POST http://localhost:8000/v1/chat/completions \
-   -H "Content-Type: application/json" \
-   -d '{
-     "model": "auto-router",
-     "messages": [{"role": "user", "content": "What is the capital of France?"}]
-   }'
-   ```
+### Live Grafana Dashboards
 
-5. **View the Dashboard:**
-   Open `http://localhost:3000` to access Grafana (Username: `admin` / Password: `admin`). 
+Cache hits vs misses:
 
----
+![Grafana dashboard - cache hits vs misses](dashboard03.png)
+![Grafana dashboard - cache hits vs misses](dashboard05.png)
 
-## 🔬 Engineering Challenges & Solutions
+Token usage and latency:
 
-*   **Challenge:** Python module pathing in Docker vs Local environments caused `ModuleNotFoundError` and circular imports.
-    *   **Solution:** Restructured data models into a separate `models.py` file to break circular dependencies. Utilized `PYTHONPATH` locally and changed the Dockerfile `WORKDIR` to `/app/src` to standardize module resolution without changing application code.
-*   **Challenge:** Substring matching in the routing classifier caused false positives (e.g., the word "c-API-tal" contained the keyword "api", routing simple prompts to the expensive model).
-    *   **Solution:** Refactored the classifier to split the prompt into a set of words and use set-intersection matching instead of basic substring matching.
-*   **Challenge:** Dependency conflicts between FastAPI/Starlette, the OpenAI Python SDK, and the Prometheus Instrumentator caused runtime crashes (`proxies` keyword error).
-    *   **Solution:** Pinned the exact required versions (`httpx==0.27.0`, `starlette==0.37.2`, etc.) in `requirements.txt` to ensure reproducible, stable builds across all environments.
+![Grafana dashboard - token usage and latency](dashboard08.png)
+![Grafana dashboard - token usage and latency](dashboard06.png)
 
+Terminal view:
 
+![Terminal view of gateway logs](dashboard01.png)
 
-***
-# Commmands:
-***
-### 🚀 Lifecycle Management (Docker Compose)
+### Reading the Numbers: Three Places to Look
 
-**Start the entire system (Gateway + Redis + Prometheus + Grafana):**
-```bash
-docker-compose up -d
-```
+**1. The terminal logs — see routing decisions live.** Run:
 
-**Stop the entire system (safely shuts down all containers):**
-```bash
-docker-compose down
-```
-
-**Rebuild the system (use this if you change `requirements.txt`, `Dockerfile`, or `docker-compose.yml`):**
-```bash
-docker-compose up -d --build
-```
-
----
-
-### 📋 Monitoring & Debugging
-
-**Check if all 4 containers are running:**
-```bash
-docker ps
-```
-
-**View live logs for the FastAPI Gateway (great for seeing routing and cache hits):**
 ```bash
 docker logs -f llm-gateway-app
 ```
-*(Press `Ctrl+C` to exit the live log view).*
 
-**View live logs for everything at once:**
-```bash
-docker-compose logs -f
+When requests arrive, lines appear in real time, such as:
+
+```text
+[Router] Prompt Type: SIMPLE | Routing to: open-mistral-7b
+[Cache] Saved to cache.
 ```
 
----
+Press `Ctrl+C` to exit the live log view.
 
-### 🧪 Testing & Benchmarking
+**2. The raw metrics endpoint — Prometheus format.** Open
+`http://localhost:8000/metrics` and scroll to the `gateway_` section. The
+custom metrics update live; examples include:
 
-**Send a test prompt to the Gateway:**
-```bash
-curl -X POST http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"model": "auto-router", "messages": [{"role": "user", "content": "What is the capital of France?"}]}'
+```text
+gateway_llm_tokens_total{model="ministral-8b-latest",token_type="prompt"} 10.0
+gateway_llm_latency_seconds_sum{model="ministral-8b-latest"} 1.23
 ```
 
-**Run the 50-request benchmark script (generates traffic and calculates cost savings):**
-```bash
-python benchmark.py
-```
+| Metric | Meaning |
+| --- | --- |
+| `gateway_cache_hits_total` | Responses served from the semantic cache |
+| `gateway_llm_tokens_total{model, token_type}` | Prompt and completion tokens consumed per model |
+| `gateway_llm_latency_seconds_sum{model}` | Cumulative LLM call latency per model |
 
----
+Alongside these, the `gateway_` metric family tracks per-request cost and
+request totals.
 
-### 🗄️ Redis Cache Maintenance
+**3. The Grafana dashboard — the visual UI.** On a fresh container start, the
+dashboard needs to be created once:
 
-**Wipe the semantic cache clean (forces the gateway to make fresh LLM calls):**
-```bash
-docker exec -it llm-gateway-redis redis-cli FLUSHALL
-```
+1. Go to `http://localhost:3000` (login `admin` / `admin`; you will be prompted
+   to change the password on first login).
+2. Click the **Plus (+) icon**, then **New Dashboard**, then **Add Visualization**.
+3. Select **Prometheus** as the data source.
+4. In the query box, click **Select metric** and search for
+   `gateway_cache_hits_total`.
+5. Change the visualization type on the right to **Stat**.
+6. Click **Save**.
 
----
+## Tech Stack
 
-### 💻 Local Development (Without Docker)
+| Layer | Technology |
+| --- | --- |
+| API framework | FastAPI (Python 3.12) |
+| LLM routing | OpenAI-compatible client (Mistral AI) |
+| Caching layer | Redis, NumPy (cosine similarity vector math) |
+| Security | Custom regex PII redaction, prompt injection defense |
+| Observability | Prometheus, Grafana |
+| Containerization | Docker, Docker Compose |
 
-If you want to run the FastAPI server locally on your machine (without Docker) while keeping Redis in Docker:
+## Project Structure
 
-**1. Start only Redis via Docker:**
-```bash
-docker run -d --name redis-local -p 6379:6379 redis
-```
-
-**2. Activate your local Python environment:**
-```bash
-source venv/bin/activate
-```
-
-**3. Run the FastAPI server locally:**
-```bash
-PYTHONPATH=src python -m uvicorn main:app --reload --port 8000
-```
-
----
-
-### 🧹 Complete Cleanup (Free up disk space)
-
-**Stop containers AND delete their volumes (wipes all persistent data):**
-```bash
-docker-compose down -v
-```
-
-**Remove the built Docker image (forces a complete fresh build next time):**
-```bash
-docker rmi llm-gateway-gateway
-```
-
-***
-
-### Accessing the UIs
-*   **FastAPI Docs (Swagger UI):** `http://localhost:8000/docs`
-*   **Raw Prometheus Metrics:** `http://localhost:8000/metrics`
-*   **Prometheus Dashboard:** `http://localhost:9090`
-*   **Grafana Dashboard:** `http://localhost:3000` (admin / admin)
-
-
-
-
-***
-# File Stucture:
-***
-
+```text
 llm-gateway/
 ├── .env                      # Environment variables (MISTRAL_API_KEY)
 ├── .dockerignore             # Files ignored by Docker (venv, .env, etc.)
@@ -299,44 +283,262 @@ llm-gateway/
     └── core/
         ├── __init__.py
         ├── router.py         # Dynamic routing logic, metrics recording
-        ├── security.py       # PII redaction & prompt injection defense
-        ├── cache.py          # Semantic caching (Redis + Vector Embeddings)
+        ├── security.py       # PII redaction and prompt injection defense
+        ├── cache.py          # Semantic caching (Redis + vector embeddings)
         └── metrics.py        # Prometheus custom metrics definitions
+```
 
+## Setup and Installation
 
+### 1. Clone the Repository
 
-***
-# Server logs:
-***
+```bash
+git clone https://github.com/sam-k99/llm-gateway.git
+cd llm-gateway
+```
 
+### 2. Set Environment Variables
 
-# To see the "stats"  you have **three places** to look:
-***
+Create a `.env` file in the root directory with your API key:
 
+```env
+MISTRAL_API_KEY=your-mistral-api-key-here
+```
 
-### 1. The Terminal Logs (See the routing decisions live)
-If you want to see your Gateway thinking and routing in real-time, run this command in your terminal:
+### 3. Start the Infrastructure
+
+Ensure Docker and Docker Compose are installed, then:
+
+```bash
+docker-compose up -d --build
+```
+
+This starts the four containers listed in the
+[Architecture](#architecture) section: the FastAPI gateway on port 8000, Redis
+on 6379, Prometheus on 9090, and Grafana on 3000.
+
+### 4. Verify the Endpoint
+
+```bash
+curl -X POST http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "auto-router",
+    "messages": [{"role": "user", "content": "What is the capital of France?"}]
+  }'
+```
+
+### 5. Open the Dashboard
+
+Visit `http://localhost:3000` to access Grafana (username `admin`, password
+`admin`), then follow the first-time setup steps under
+[Observability](#observability).
+
+## Usage
+
+### Calling the Gateway
+
+Send requests exactly as you would to any OpenAI-compatible API, using the
+virtual model name `auto-router` — the gateway classifies the prompt and
+picks the concrete model for you:
+
+```bash
+curl -X POST http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "auto-router", "messages": [{"role": "user", "content": "What is the capital of France?"}]}'
+```
+
+Because the endpoint follows the OpenAI chat-completions schema, existing
+OpenAI clients and SDKs can simply point their base URL at the gateway.
+
+### A Sample Session
+
+Abridged and illustrative — exact wording varies by request and run. Watch the
+logs in one terminal while sending requests from another:
+
+```text
+$ docker logs -f llm-gateway-app
+
+  # First request - a miss, so the pipeline runs end to end
+  [Router] Prompt Type: SIMPLE | Routing to: open-mistral-7b
+  [Cache] MISS - no similar prompt found
+  [Cache] Saved to cache.
+
+  # The same question rephrased - served without calling the LLM
+  [Cache] HIT - similar prompt found (similarity above threshold)
+  [Cache] Returning cached response
+```
+
+### Running the Benchmark
+
+The benchmark script generates 50 varied and semantically duplicated requests,
+then calculates the cost savings:
+
+```bash
+python benchmark.py
+```
+
+## Command Reference
+
+### Lifecycle Management
+
+Start the entire system (gateway + Redis + Prometheus + Grafana):
+
+```bash
+docker-compose up -d
+```
+
+Stop the entire system (safely shuts down all containers):
+
+```bash
+docker-compose down
+```
+
+Rebuild the system — use this after changing `requirements.txt`, `Dockerfile`,
+or `docker-compose.yml`:
+
+```bash
+docker-compose up -d --build
+```
+
+### Monitoring and Debugging
+
+Check that all four containers are running:
+
+```bash
+docker ps
+```
+
+View live logs for the FastAPI gateway — the best way to watch routing
+decisions and cache hits happen:
+
 ```bash
 docker logs -f llm-gateway-app
 ```
-When you send that `curl` command, you will see lines pop up in this terminal like:
-*   `[Router] Prompt Type: SIMPLE | Routing to: open-mistral-7b`
-*   `[Cache] 💾 Saved to cache.`
-*(Press `Ctrl+C` to exit the live logs).*
 
-### 2. The Raw Metrics (Prometheus format)
-Open your web browser and go to:
-**http://localhost:8000/metrics**
+View live logs for everything at once:
 
-Scroll down to the `gateway_` section. You will see your custom metrics updating. You'll see things like:
-*   `gateway_llm_tokens_total{model="ministral-8b-latest",token_type="prompt"} 10.0`
-*   `gateway_llm_latency_seconds_sum{model="ministral-8b-latest"} 1.23`
+```bash
+docker-compose logs -f
+```
 
-### 3. The Grafana Dashboard (The Visual UI)
-Since you just spun up the containers fresh, you will need to do the Grafana setup one more time to see the visual graph:
-1. Go to **http://localhost:3000** (Login: `admin` / `admin`).    --change pass according to you 
-2. Click the **Plus (+) icon** -> **New Dashboard** -> **Add Visualization**.
-3. Select **Prometheus** as the data source.
-4. Under the Query box, click **"Select metric"** and search for `gateway_cache_hits_total`.
-5. Change the visualization type on the right to **Stat**.
-6. Click **Save**.
+### Testing and Benchmarking
+
+Send a test prompt:
+
+```bash
+curl -X POST http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "auto-router", "messages": [{"role": "user", "content": "What is the capital of France?"}]}'
+```
+
+Run the 50-request benchmark (generates traffic and calculates cost savings):
+
+```bash
+python benchmark.py
+```
+
+### Redis Cache Maintenance
+
+Wipe the semantic cache clean — forces the gateway to make fresh LLM calls:
+
+```bash
+docker exec -it llm-gateway-redis redis-cli FLUSHALL
+```
+
+### Local Development Without Docker
+
+Run the FastAPI server locally on your machine while keeping Redis in Docker:
+
+```bash
+docker run -d --name redis-local -p 6379:6379 redis
+source venv/bin/activate
+PYTHONPATH=src python -m uvicorn main:app --reload --port 8000
+```
+
+### Complete Cleanup
+
+Stop containers and delete their volumes (wipes all persistent data):
+
+```bash
+docker-compose down -v
+```
+
+Remove the built Docker image (forces a complete fresh build next time):
+
+```bash
+docker rmi llm-gateway-gateway
+```
+
+## Accessing the UIs
+
+| URL | What it is |
+| --- | --- |
+| `http://localhost:8000/docs` | FastAPI interactive documentation (Swagger UI) |
+| `http://localhost:8000/metrics` | Raw Prometheus metrics |
+| `http://localhost:9090` | Prometheus dashboard |
+| `http://localhost:3000` | Grafana dashboard (`admin` / `admin`) |
+
+## Engineering Challenges and Solutions
+
+**Module resolution across environments.** Python module pathing behaved
+differently in Docker versus local runs, causing `ModuleNotFoundError` and
+circular imports. The fix was structural: data models were moved into a
+separate `models.py` to break the circular dependencies, `PYTHONPATH` was used
+locally, and the Dockerfile `WORKDIR` was changed to `/app/src` — standardizing
+module resolution everywhere without touching application code.
+
+**Substring matching false positives.** The routing classifier originally used
+substring matching, which meant the word "c-API-tal" contained the keyword
+"api" and simple prompts were misrouted to the expensive model. The classifier
+was refactored to split the prompt into a set of words and use set-intersection
+matching instead of raw substring search.
+
+**Dependency version conflicts.** FastAPI/Starlette, the OpenAI Python SDK, and
+the Prometheus Instrumentator fought each other at runtime (the `proxies`
+keyword error). The exact required versions (`httpx==0.27.0`,
+`starlette==0.37.2`, and others) are pinned in `requirements.txt` to guarantee
+reproducible, stable builds across all environments.
+
+## Limitations and Scope
+
+This is a demonstration of gateway patterns, and it is honest about being one:
+
+- A single LLM provider (Mistral AI) is wired up; the routing logic is designed
+  to extend across providers but ships with one.
+- Responses are non-streaming; the full completion returns before the client
+  sees anything.
+- There is no authentication or rate limiting on the gateway endpoint itself.
+- The 0.85 similarity threshold is hand-tuned; the right value depends on your
+  tolerance for near-duplicate answers.
+- PII redaction is regex-based — pattern matching, not entity recognition — and
+  covers common formats only.
+- Cache entries are not TTL-evicted in this demo, so the cache grows with
+  unique traffic.
+
+## Roadmap
+
+- Multi-provider routing (OpenAI, Anthropic) with per-provider cost and
+  latency-aware model selection
+- Streaming responses via server-sent events
+- API-key authentication and per-client rate limiting
+- TTL-based cache eviction and smarter invalidation policies
+- Auto-provisioned Grafana dashboards, removing the manual first-time setup
+- Kubernetes deployment manifests for horizontal scaling
+
+## Contributing
+
+Pull requests are welcome. If you extend the routing logic, cache layer, or
+guardrails, please include benchmark results from `python benchmark.py` before
+and after your change so reviewers can see the impact.
+
+## License
+
+No license file is bundled yet. If you plan to reuse this project, add one
+(MIT and Apache-2.0 are common defaults) so downstream users know their rights.
+
+<div align="center">
+
+Thanks for stopping by <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Cat.png" alt="Cat" width="32" height="32" />
+
+</div>
