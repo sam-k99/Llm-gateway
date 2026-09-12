@@ -1,4 +1,6 @@
-# LLM Gateway
+<div align="centre">
+  
+  # LLM Gateway
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white)
@@ -13,6 +15,8 @@
 > cache, and scrubbing PII before anything leaves your perimeter.
 
 ![Dashboard](assets/dashboard02.png)
+
+</div>
 
 ## Overview
 
