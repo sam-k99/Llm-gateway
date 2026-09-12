@@ -13,7 +13,7 @@
 > cache, and scrubbing PII before anything leaves your perimeter.
 
 <p align="center">
-  <img width="1920" height="995" alt="Grafana live monitoring dashboard" src="https://github.com/user-attachments/assets/18a6c41a-8308-4856-bef3-f3c3ed5de8aa" />
+  ![Dashboard](assets/dashboard01.png)
 </p>
 
 ## Overview
