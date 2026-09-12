@@ -12,8 +12,7 @@
 > provider — routing by complexity, answering duplicates instantly from a semantic
 > cache, and scrubbing PII before anything leaves your perimeter.
 
-<p align="center">
-  ![Dashboard]("assets/dashboard01.png")
+<p align="center">![Dashboard]("assets/dashboard01.png")
 </p>
 
 ## Overview
