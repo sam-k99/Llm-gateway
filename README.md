@@ -13,7 +13,7 @@
 > cache, and scrubbing PII before anything leaves your perimeter.
 
 <p align="center">
-  ![Dashboard](assets/dashboard01.png)
+  ![Dashboard]("assets/dashboard01.png")
 </p>
 
 ## Overview
