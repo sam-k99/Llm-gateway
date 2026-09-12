@@ -14,7 +14,7 @@
 
 <div align="center">
   ![Dashboard](assets/dashboard01.png)
-
+</div>
 ## Overview
 
 The **LLM Gateway** is a high-throughput, production-grade API middleware designed
